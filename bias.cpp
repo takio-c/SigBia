@@ -107,7 +107,7 @@ int main(int argc, char* argv[])
 		// P next
 		P = ( (K * H).ide() - K * H) * P;
 		// output
-		printf("%lf %lf %lf %lf %lf %lf %lf %s",
+		printf("%lf %lf %lf %lf %lf %lf %s",
 				Z[0][0],		// sensor
 				S[0][0],		// signal
 				B[0][0],		// bias
