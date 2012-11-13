@@ -1,7 +1,7 @@
 CC			= g++
 LD			= g++
 TARGET		= bias.out
-CINCLUDES	= -I./matrix/
+CINCLUDES	= -I../matrix/
 LINCLUDES	= 
 CFLAGS		= -O3
 LFLAGS		= -O3
