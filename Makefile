@@ -10,6 +10,7 @@ all: $(TARGET)
 
 $(TARGET): bias.o
 	$(LD) $(LFLAGS) $(LINCLUDES) -o $(TARGET) bias.o
+	./$(TARGET) > data.txt
 
 bias.o: bias.cpp
 	$(CC) $(CFLAGS) $(CINCLUDES) -c bias.cpp
