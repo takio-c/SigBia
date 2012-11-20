@@ -17,13 +17,13 @@ float Normal( void ){
 
 #define VAR(s)	sqrt(var_##s)
 #define STV_NUM	3				// 状態数
-#define SEN_NUM	2				// 状態数
+#define SEN_NUM	3				// 状態数
 #define MES_NUM	1				// 観測数
 #define Fs		100.0			// サンプリング周期
 #define Ts		(1.0/Fs)		// サンプリング間隔
 #define T		10.0			// 信号周期
 #define OMEGA	(2.0*M_PI/T)	// 信号角速度
-#define BIAS	20.0
+#define BIAS	2.0
 
 double s[STV_NUM] = {
 	0.0,	// low freq noise
@@ -41,33 +41,39 @@ double f[STV_NUM*STV_NUM] = {
 	0.0,	0.0,	0.0,	// for bias
 };
 double b[STV_NUM*SEN_NUM] = {
-	1.0,	0.0,	// for sensor1 noise
-	0.0,	0.0,	// for sensor1 bias
-	0.0,	1.0,	// for sensor1 noise
+	1.0,	0.0,	0.0,	// for sensor1 noise
+	0.0,	1.0,	0.0,	// for sensor1 bias
+	0.0,	0.0,	1.0,	// for sensor1 noise
 };
 double h[MES_NUM*STV_NUM] = {
 	1.0,	1.0,	-1.0,	// 
 };
 // var
 double var_e[STV_NUM*STV_NUM] = {
-	1000.0,	0.0,	0.0,	// 
-	0.0,	1000.0,	0.0,	// 
-	0.0,	0.0,	1000.0,	// 
+	1.0,	0.0,	0.0,	// 
+	0.0,	1.0,	0.0,	// 
+	0.0,	0.0,	1.0,	// 
 };
 double var_v[SEN_NUM] = {
-	60.,	// on sensor
-	60.,	// on sensor
+	.001,	// on sensor1 noise
+	.0,	// on sensor1 bias
+	.001,	// on sensor2 noise
 };
 double var_w[MES_NUM] = {
-	0.00001,	// on measure
+	0.0001,	// on measure
 };
 
 double getSig(int i)
 {
 	double sig;
 	double noise;
-	sig = 40*sin(0.005*i) + 10;
-	noise = sqrt(10)*Normal();
+	if(i < 500){
+		sig = 0.0;
+	}
+	else{
+		sig = 0.01*sin(OMEGA*Ts*i);
+	}
+	noise = sqrt(0.1)*Normal();
 	return sig + noise;
 }
 
@@ -79,15 +85,19 @@ int main(int argc, char* argv[])
 	Matrix<double> F(STV_NUM, STV_NUM, "F");
 	Matrix<double> B(STV_NUM, SEN_NUM, "B");
 	Matrix<double> V(SEN_NUM, 1, "V");
+	Matrix<double> v(SEN_NUM, 1, "V");
 	Matrix<double> Q(SEN_NUM, SEN_NUM, "Q");
 	// measure
 	Matrix<double> Z(MES_NUM, 1, "Z");
 	Matrix<double> H(MES_NUM, STV_NUM, "H");
 	Matrix<double> W(MES_NUM, 1, "W");
+	Matrix<double> w(MES_NUM, 1, "W");
 	Matrix<double> R(MES_NUM, MES_NUM, "R");
 	// Kalman
 	Matrix<double> P(STV_NUM, STV_NUM, "P");
 	Matrix<double> K(STV_NUM, MES_NUM, "K");
+	// integral
+	double sig_t, sig_e;
 
 	// init
 	S.Set(s);
@@ -99,8 +109,10 @@ int main(int argc, char* argv[])
 	Q.Dia(var_v);
 	R.Dia(var_w);
 	P.Set(var_e);
+	// integral
+	sig_t = sig_e = 0.0;
 
-	unsigned int loop = 1000;
+	unsigned int loop = 100;
 	if(1 < argc) loop = atoi(argv[1]);
 
 	for(int i = 0; i < loop; i++){
@@ -108,9 +120,11 @@ int main(int argc, char* argv[])
 		for(int n = 0; n < SEN_NUM; n++){
 			V[n][0] = VAR(v[n])*Normal();
 		}
+		v += V;
 		for(int n = 0; n < MES_NUM; n++){
 			W[n][0] = VAR(w[n])*Normal();
 		}
+		w += W;
 		// make error on sensor
 		S = F * S + B * V;
 		// set sensor
@@ -128,8 +142,10 @@ int main(int argc, char* argv[])
 		// set estimate
 		double x1 = s1 - X[0][0] - X[1][0];
 		double x2 = s2 - X[2][0];
+		sig_t += sig;
+		sig_e += x1;
 		// output
-		printf("%lf %lf %lf %lf %lf %lf %lf%s",
+		printf("%lf %lf %lf %lf %lf %lf %lf %lf %lf %s",
 				sig,			// signal
 				s1,				// sensor1
 				x1,				// estimate1
@@ -137,10 +153,14 @@ int main(int argc, char* argv[])
 				x2,				// estimate2
 				S[1][0],		// sensor1 bias
 				X[1][0],		// estimate bias
+				sig_t,
+				sig_e,
 				"\n"
 			  );
 		// status update
 	}
+	V.print();
+	W.print();
 	P.print();
 
 	return 0;
