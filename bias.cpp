@@ -3,19 +3,26 @@
 #include <math.h>
 #include "matrix.h"
 
-float Uniform( void ){
-	static int x=10;
-	int a=1103515245,b=12345,c=2147483647;
-	x = (a*x + b)&c;
+double Normal(double exp, double var)
+{
+	static int sw = 0;
+	static double n1;
+	double n2;
 
-	return (float)(((double)x+1.0) / ((double)c+2.0));
+	double r1 = ((double)rand()) / RAND_MAX;
+	double r2 = ((double)rand()) / RAND_MAX;
+	if(sw == 0){
+		n1 = sqrt(-2.0 * log(r1)) * cos(2.0 * M_PI * r2);
+		n2 = sqrt(-2.0 * log(r1)) * sin(2.0 * M_PI * r2);
+		sw = 1;
+		return sqrt(var) * n2 + exp;
+	}
+	else{
+		sw = 0;
+		return sqrt(var) * n1 + exp;
+	}
 }
 
-float Normal( void ){
-	return sqrt( -log(Uniform())*2.0 ) * sin( 2.0*M_PI*Uniform() );
-}
-
-#define VAR(s)	sqrt(var_##s)
 #define STV_NUM	3				// 状態数
 #define SEN_NUM	3				// 状態数
 #define MES_NUM	1				// 観測数
@@ -73,7 +80,7 @@ double getSig(int i)
 	else{
 		sig = 0.01*sin(OMEGA*Ts*i);
 	}
-	noise = sqrt(0.1)*Normal();
+	noise = Normal(0.0, 0.1);
 	return sig + noise;
 }
 
@@ -85,13 +92,11 @@ int main(int argc, char* argv[])
 	Matrix<double> F(STV_NUM, STV_NUM, "F");
 	Matrix<double> B(STV_NUM, SEN_NUM, "B");
 	Matrix<double> V(SEN_NUM, 1, "V");
-	Matrix<double> v(SEN_NUM, 1, "V");
 	Matrix<double> Q(SEN_NUM, SEN_NUM, "Q");
 	// measure
 	Matrix<double> Z(MES_NUM, 1, "Z");
 	Matrix<double> H(MES_NUM, STV_NUM, "H");
 	Matrix<double> W(MES_NUM, 1, "W");
-	Matrix<double> w(MES_NUM, 1, "W");
 	Matrix<double> R(MES_NUM, MES_NUM, "R");
 	// Kalman
 	Matrix<double> P(STV_NUM, STV_NUM, "P");
@@ -112,19 +117,17 @@ int main(int argc, char* argv[])
 	// integral
 	sig_t = sig_e = 0.0;
 
-	unsigned int loop = 100;
+	unsigned int loop = 1000;
 	if(1 < argc) loop = atoi(argv[1]);
 
 	for(int i = 0; i < loop; i++){
 		double sig = getSig(i);
 		for(int n = 0; n < SEN_NUM; n++){
-			V[n][0] = VAR(v[n])*Normal();
+			V[n][0] = Normal(0.0, var_v[n]);
 		}
-		v += V;
 		for(int n = 0; n < MES_NUM; n++){
-			W[n][0] = VAR(w[n])*Normal();
+			W[n][0] = Normal(0.0, var_w[n]);
 		}
-		w += W;
 		// make error on sensor
 		S = F * S + B * V;
 		// set sensor
@@ -159,8 +162,6 @@ int main(int argc, char* argv[])
 			  );
 		// status update
 	}
-	V.print();
-	W.print();
 	P.print();
 
 	return 0;
