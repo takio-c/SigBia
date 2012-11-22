@@ -23,89 +23,89 @@ double Normal(double exp, double var)
 	}
 }
 
-#define STV_NUM	3				// 状態数
-#define SEN_NUM	3				// 状態数
+#define STV_NUM	2				// 状態数
+#define NOI_NUM	2				// ノイズ源数
 #define MES_NUM	1				// 観測数
 #define Fs		100.0			// サンプリング周期
 #define Ts		(1.0/Fs)		// サンプリング間隔
-#define T		10.0			// 信号周期
+#define T		2.0			// 信号周期
 #define OMEGA	(2.0*M_PI/T)	// 信号角速度
-#define BIAS	2.0
+#define BIAS	1.0
+#define STOP	1000
 
 double s[STV_NUM] = {
-	0.0,	// low freq noise
-	BIAS,	// bias
-	0.0,	// high freq noise
+	0.0,	// accelerometer noise
+	BIAS,	// gyro bias
 };
 double x[STV_NUM] = {
-	0.0,	// signal
-	0.0,	// differencial
-	0.0,	// bias
+	0.0,	// accelerometer noise
+	0.0,	// gyro bias
 };
 double f[STV_NUM*STV_NUM] = {
-	0.0,	0.0,	0.0,	// for signal
-	0.0,	1.0,	0.0,	// for differencial
-	0.0,	0.0,	0.0,	// for bias
+	0.0,	0.0,	// accelerometer noise
+	0.0,	1.0,	// gyro bias
 };
-double b[STV_NUM*SEN_NUM] = {
-	1.0,	0.0,	0.0,	// for sensor1 noise
-	0.0,	1.0,	0.0,	// for sensor1 bias
-	0.0,	0.0,	1.0,	// for sensor1 noise
+double b[STV_NUM*NOI_NUM] = {
+	1.0,	0.0,	// accelerometer noise
+	0.0,	1.0,	// gyro bias drift
 };
 double h[MES_NUM*STV_NUM] = {
-	1.0,	1.0,	-1.0,	// 
+	1.0,	1.0,	// 
 };
 // var
-double var_e[STV_NUM*STV_NUM] = {
-	1.0,	0.0,	0.0,	// 
-	0.0,	1.0,	0.0,	// 
-	0.0,	0.0,	1.0,	// 
+double var_e[STV_NUM] = {
+	1.0,	// about accelerometer
+	1.0,	// about gyro bias
 };
-double var_v[SEN_NUM] = {
-	.001,	// on sensor1 noise
-	.0,	// on sensor1 bias
-	.001,	// on sensor2 noise
+double var_v[NOI_NUM] = {
+	1.0,		// on accelerometer
+	0.00001,	// on gyro bias
 };
 double var_w[MES_NUM] = {
-	0.0001,	// on measure
+	0.0,	// on measure
 };
 
-double getSig(int i)
+double getTheta(int i)
 {
-	double sig;
-	double noise;
-	if(i < 500){
-		sig = 0.0;
-	}
-	else{
-		sig = 0.01*sin(OMEGA*Ts*i);
-	}
-	noise = Normal(0.0, 0.1);
-	return sig + noise;
+	double theta=0.0;
+	double noise=0.0;
+	if(STOP < i) i = STOP;
+	theta = M_PI_2*sin(OMEGA*Ts*i);
+	noise = Normal(0.0, 0.01);
+	return theta + noise;
+}
+
+double getOmega(int i)
+{
+	double omega=0.0;
+	double noise=0.0;
+	if(STOP < i) i = STOP;
+	omega = OMEGA*M_PI_2*cos(OMEGA*Ts*i);
+	noise = Normal(0.0, 0.01);
+	return omega + noise;
 }
 
 int main(int argc, char* argv[])
 {
 	// status equation
-	Matrix<double> S(STV_NUM, 1, "S");
 	Matrix<double> X(STV_NUM, 1, "X");
 	Matrix<double> F(STV_NUM, STV_NUM, "F");
-	Matrix<double> B(STV_NUM, SEN_NUM, "B");
-	Matrix<double> V(SEN_NUM, 1, "V");
-	Matrix<double> Q(SEN_NUM, SEN_NUM, "Q");
+	Matrix<double> B(STV_NUM, NOI_NUM, "B");
+	Matrix<double> V(NOI_NUM, 1, "V");
+	Matrix<double> Q(NOI_NUM, NOI_NUM, "Q");
 	// measure
 	Matrix<double> Z(MES_NUM, 1, "Z");
 	Matrix<double> H(MES_NUM, STV_NUM, "H");
-	Matrix<double> W(MES_NUM, 1, "W");
 	Matrix<double> R(MES_NUM, MES_NUM, "R");
 	// Kalman
 	Matrix<double> P(STV_NUM, STV_NUM, "P");
 	Matrix<double> K(STV_NUM, MES_NUM, "K");
+	// sensor
+	double theta_a, theta_w;
 	// integral
-	double sig_t, sig_e;
+	double sig_t, sig_o;
 
 	// init
-	S.Set(s);
 	X.Set(x);
 	H.Set(h);
 	F.Set(f);
@@ -113,51 +113,52 @@ int main(int argc, char* argv[])
 	// var
 	Q.Dia(var_v);
 	R.Dia(var_w);
-	P.Set(var_e);
+	P.Dia(var_e);
 	// integral
-	sig_t = sig_e = 0.0;
+	theta_a = theta_w = 0.0;
+	sig_t = sig_o = 0.0;
 
 	unsigned int loop = 1000;
 	if(1 < argc) loop = atoi(argv[1]);
 
 	for(int i = 0; i < loop; i++){
-		double sig = getSig(i);
-		for(int n = 0; n < SEN_NUM; n++){
+		// true parameter
+		double theta = getTheta(i);
+		double omega = getOmega(i);
+		// sensor white noise
+		for(int n = 0; n < NOI_NUM; n++){
 			V[n][0] = Normal(0.0, var_v[n]);
 		}
-		for(int n = 0; n < MES_NUM; n++){
-			W[n][0] = Normal(0.0, var_w[n]);
-		}
-		// make error on sensor
-		S = F * S + B * V;
-		// set sensor
-		double s1 = sig + S[0][0] + S[1][0];
-		double s2 = sig + S[2][0];
-		Z = H * S + W;
+		// sensor
+		double sen_a = theta + V[0][0];
+		double sen_w = omega + BIAS + V[1][0] + Normal(0.0, 1.1);
+		// measure
+		theta_a = sen_a;
+		theta_w += Ts * sen_w;
+		Z[0][0] = theta_a - theta_w;
 		// P previous
 		P = F * P * F.tra() + B * Q * B.tra();
 		// gain
+		H[0][1] = - (i+1) * Ts;
 		K = P * H.tra() * (H * P * H.tra() + R).inv();
 		// update
 		X = F * X + K * (Z - H * F * X);
 		// P next
 		P = ( (K * H).ide() - K * H) * P;
-		// set estimate
-		double x1 = s1 - X[0][0] - X[1][0];
-		double x2 = s2 - X[2][0];
-		sig_t += sig;
-		sig_e += x1;
+		// feed back
+		theta_a -= X[0][0];
+		double theta_ww = theta_w - (i+1)*Ts*X[1][0];
+//		theta_w -= Ts*(X[1][0] + X[2][0]);
 		// output
-		printf("%lf %lf %lf %lf %lf %lf %lf %lf %lf %s",
-				sig,			// signal
-				s1,				// sensor1
-				x1,				// estimate1
-				s2,				// sensor2
-				x2,				// estimate2
-				S[1][0],		// sensor1 bias
-				X[1][0],		// estimate bias
-				sig_t,
-				sig_e,
+		printf("%lf %lf %lf %lf %lf %lf %lf %lf %s",
+				theta,			// theta
+				omega,			// omega
+				sen_a,			// accelerometer
+				sen_w,			// gyro
+				theta_a,		// from accl
+				theta_ww,		// from gyro
+				BIAS,			// true tyro bias
+				X[1][0],		// estimate gyro bias
 				"\n"
 			  );
 		// status update
