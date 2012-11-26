@@ -31,7 +31,9 @@ double Normal(double exp, double var)
 #define T		2.0			// 信号周期
 #define OMEGA	(2.0*M_PI/T)	// 信号角速度
 #define BIAS	1.0
-#define STOP	1000
+#define LOOP	1500
+#define SIG_DELAY	100
+#define SIG_TIME	400
 
 double s[STV_NUM] = {
 	0.0,	// accelerometer noise
@@ -58,7 +60,7 @@ double var_e[STV_NUM] = {
 	1.0,	// about gyro bias
 };
 double var_v[NOI_NUM] = {
-	1.0,		// on accelerometer
+	0.1,		// on accelerometer
 	0.00001,	// on gyro bias
 };
 double var_w[MES_NUM] = {
@@ -69,9 +71,15 @@ double getTheta(int i)
 {
 	double theta=0.0;
 	double noise=0.0;
-	if(STOP < i) i = STOP;
-	theta = M_PI_2*sin(OMEGA*Ts*i);
-	noise = Normal(0.0, 0.01);
+	if(i < SIG_DELAY){
+		i = SIG_DELAY;
+	}
+	i -= SIG_DELAY;
+	if(SIG_TIME < i){
+		i = SIG_TIME;
+	}
+	theta = 0.25 * (OMEGA*Ts*i - sin(OMEGA*Ts*i));
+//	noise = Normal(0.0, 0.1);
 	return theta + noise;
 }
 
@@ -79,9 +87,15 @@ double getOmega(int i)
 {
 	double omega=0.0;
 	double noise=0.0;
-	if(STOP < i) i = STOP;
-	omega = OMEGA*M_PI_2*cos(OMEGA*Ts*i);
-	noise = Normal(0.0, 0.01);
+	if(i < SIG_DELAY){
+		i = SIG_DELAY;
+	}
+	i -= SIG_DELAY;
+	if(SIG_TIME < i){
+		i = SIG_TIME;
+	}
+	omega = 0.25*OMEGA*(1.0 - cos(OMEGA*Ts*i));
+//	noise = Normal(0.0, 0.1);
 	return omega + noise;
 }
 
@@ -118,7 +132,7 @@ int main(int argc, char* argv[])
 	theta_a = theta_w = 0.0;
 	sig_t = sig_o = 0.0;
 
-	unsigned int loop = 1000;
+	unsigned int loop = LOOP;
 	if(1 < argc) loop = atoi(argv[1]);
 
 	for(int i = 0; i < loop; i++){
@@ -131,7 +145,7 @@ int main(int argc, char* argv[])
 		}
 		// sensor
 		double sen_a = theta + V[0][0];
-		double sen_w = omega + BIAS + V[1][0] + Normal(0.0, 1.1);
+		double sen_w = omega + BIAS + V[1][0] + Normal(0.0, 0.01);
 		// measure
 		theta_a = sen_a;
 		theta_w += Ts * sen_w;
