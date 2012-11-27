@@ -32,7 +32,7 @@ double Normal(double exp, double var)
 #define OMEGA	(2.0*M_PI/T)	// 信号角速度
 #define BIAS	1.0
 #define LOOP	1500
-#define SIG_DELAY	100
+#define SIG_DELAY	0
 #define SIG_TIME	400
 
 double s[STV_NUM] = {
@@ -78,7 +78,7 @@ double getTheta(int i)
 	if(SIG_TIME < i){
 		i = SIG_TIME;
 	}
-	theta = 0.25 * (OMEGA*Ts*i - sin(OMEGA*Ts*i));
+	theta = 0.25 * (OMEGA*Ts*i - sin(OMEGA*Ts*i)) - M_PI_2;
 //	noise = Normal(0.0, 0.1);
 	return theta + noise;
 }
@@ -129,7 +129,7 @@ int main(int argc, char* argv[])
 	R.Dia(var_w);
 	P.Dia(var_e);
 	// integral
-	theta_a = theta_w = 0.0;
+	theta_a = theta_w = getTheta(0);
 	sig_t = sig_o = 0.0;
 
 	unsigned int loop = LOOP;
@@ -162,7 +162,6 @@ int main(int argc, char* argv[])
 		// feed back
 		theta_a -= X[0][0];
 		double theta_ww = theta_w - (i+1)*Ts*X[1][0];
-//		theta_w -= Ts*(X[1][0] + X[2][0]);
 		// output
 		printf("%lf %lf %lf %lf %lf %lf %lf %lf %s",
 				theta,			// theta
