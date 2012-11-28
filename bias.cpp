@@ -30,15 +30,12 @@ double Normal(double exp, double var)
 #define Ts		(1.0/Fs)		// サンプリング間隔
 #define T		2.0			// 信号周期
 #define OMEGA	(2.0*M_PI/T)	// 信号角速度
-#define BIAS	1.0
 #define LOOP	1500
 #define SIG_DELAY	0
 #define SIG_TIME	400
 
-double s[STV_NUM] = {
-	0.0,	// accelerometer noise
-	BIAS,	// gyro bias
-};
+double BIAS = 1.0;
+
 double x[STV_NUM] = {
 	0.0,	// accelerometer noise
 	0.0,	// gyro bias
