@@ -30,9 +30,8 @@ double Normal(double exp, double var)
 #define Ts		(1.0/Fs)		// サンプリング間隔
 #define T		2.0			// 信号周期
 #define OMEGA	(2.0*M_PI/T)	// 信号角速度
-#define BIAS	1.0
 #define LOOP	1500
-#define SIG_DELAY	100
+#define SIG_DELAY	0
 #define SIG_TIME	400
 #define SIG_WAIT	400
 
@@ -106,6 +105,7 @@ public:
 		P_m = ( Matrix<double>::ide(K_m.Row()) - K_m * H_m ) * P_m;
 	}
 };
+double BIAS = 1.0;
 
 double x[STV_NUM] = {
 	0.0,	// accelerometer noise
@@ -150,7 +150,7 @@ double getTheta(int i)
 	if(SIG_TIME < i){
 		i = SIG_TIME;
 	}
-	theta = 0.25 * (OMEGA*Ts*i - sin(OMEGA*Ts*i));
+	theta = 0.25 * (OMEGA*Ts*i - sin(OMEGA*Ts*i)) - M_PI_2;
 //	noise = Normal(0.0, 0.1);
 	return theta + noise;
 }
@@ -201,7 +201,7 @@ int main(int argc, char* argv[])
 	R.Dia(var_w);
 	P.Dia(var_e);
 	// integral
-	theta_a = theta_w = 0.0;
+	theta_a = theta_w = getTheta(0);
 	sig_t = sig_o = 0.0;
 
 	unsigned int loop = LOOP;
