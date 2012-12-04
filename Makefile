@@ -1,23 +1,25 @@
 CC			= g++
 LD			= g++
 TARGET		= bias.out
+SRCS		= bias.cpp
+OBJS		= $(SRCS:%.cpp=%.o)
+DEPS		= $(SRCS:%.cpp=%.d)
 CINCLUDES	= -I../matrix/
 LINCLUDES	= 
-CFLAGS		= -O3
+CFLAGS		= -g
 LFLAGS		= -O3
 
 all: $(TARGET)
 
-$(TARGET): bias.o
-	$(LD) $(LFLAGS) $(LINCLUDES) -o $(TARGET) bias.o
+-include $(DEPS)
+
+$(TARGET): $(OBJS)
+	$(LD) $(LFLAGS) $(LINCLUDES) -o $@ $^
 	./$(TARGET) > data.txt
 
-bias.o: bias.cpp ../matrix/matrix.h
-	$(CC) $(CFLAGS) $(CINCLUDES) -c bias.cpp
-
-../matrix/matrix.h: ../matrix/vector.h
-
+%.o: %.cpp
+	$(CC) $(CFLAGS) $(CINCLUDES) -c -MMD -MP $<
 
 clean:
-	rm -f $(TARGET) *.o
+	rm -f $(TARGET) $(OBJS) $(DEPS)
 
