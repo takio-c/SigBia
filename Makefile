@@ -12,8 +12,11 @@ $(TARGET): bias.o
 	$(LD) $(LFLAGS) $(LINCLUDES) -o $(TARGET) bias.o
 	./$(TARGET) > data.txt
 
-bias.o: bias.cpp
+bias.o: bias.cpp ../matrix/matrix.h
 	$(CC) $(CFLAGS) $(CINCLUDES) -c bias.cpp
+
+../matrix/matrix.h: ../matrix/vector.h
+
 
 clean:
 	rm -f $(TARGET) *.o
