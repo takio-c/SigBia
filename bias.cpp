@@ -37,16 +37,68 @@ double Normal(double exp, double var)
 
 class Sensor
 {
+protected:
+	Matrix<double>	ref;
+	Matrix<double>	*pavg;
+	Matrix<double>	*pvar;
 
+public:
+	Sensor(Matrix<double> *p) :ref(p)
+	{
+		pavg = new Matrix<double>(ref.Row(), ref.Col());
+		pvar = new Matrix<double>(ref.Row(), ref.Col());
+	}
+	virtual ~Sensor() {
+		delete pavg;
+		delete pvar;
+	}
+
+	Matrix<double>&	getAvg() { return *pavg; }
+	Matrix<double>&	getVar() { return *pvar; }
+	Matrix<double>	getData() {
+		Matrix<double> data(ref.Row(), ref.Col());
+		data = ref;
+		for(int r = 0; r < ref.Row(); r++){
+			for(int c = 0; c < ref.Col(); c++){
+				data[r][c] += Normal((*pavg)[r][c], (*pvar)[r][c]);
+			}
+		}
+		return data;
+	}
+};
+
+class Coordinate
+{
+protected:
+	// dimension
+	const int dim;
+	// name for debug
+	std::string name;
+	// coordinate
+	Matrix<double>	world;
+	Matrix<double>	force;
+	Matrix<double>	local;
+	// Sensor
+	Sensor			*sensor;
+
+public:
+	Coordinate(const int dim)
+		:dim(dim), world(dim, dim), force(dim, dim), local(dim, dim)
+	{
+		world = world.ide();
+		local = world;
+		sensor = new Sensor(&local);
+	}
 };
 
 class KalmanFilter
 {
-protected:
-	// name for debug
+public:
+	// parameter num
 	const int stv_num;
 	const int inp_num;
 	const int mes_num;
+	// name for debug
 	std::string name;
 	// status space model
 	Matrix<double> F_m;
@@ -62,28 +114,29 @@ protected:
 	Matrix<double> P_m;
 	Matrix<double> K_m;
 
-	virtual void init() {}
 	virtual void updateModel() {}
 
 public:
 	KalmanFilter(int stv_num, int inp_num, int mes_num, std::string name="")
 		:stv_num(stv_num), inp_num(inp_num), mes_num(mes_num), name(name)
 		// status space model
-		,F_m(stv_num,stv_num,name+":F_m")
-		,x_v(stv_num,1,name+":x_v")
-		,G_m(stv_num,inp_num,name+":G_m")
-		,u_v(inp_num,1,name+":u_v")
-		,Q_m(stv_num,stv_num,name+":Q_m")
+		,F_m(stv_num,	stv_num,	name+":F_m")
+		,x_v(stv_num,	1,			name+":x_v")
+		,G_m(stv_num,	inp_num,	name+":G_m")
+		,u_v(inp_num,	1,			name+":u_v")
+		,Q_m(stv_num,	stv_num,	name+":Q_m")
 		// measurement
-		,z_v(mes_num,1,name+":z_v")
-		,H_m(mes_num,stv_num,name+":H_m")
-		,R_m(mes_num,mes_num,name+":R_m")
+		,z_v(mes_num,	1,			name+":z_v")
+		,H_m(mes_num,	stv_num,	name+":H_m")
+		,R_m(mes_num,	mes_num,	name+":R_m")
 		// Kalman Filter
-		,P_m(stv_num,stv_num,name+":P_m")
-		,K_m(stv_num,mes_num,name+":K_m")
+		,P_m(stv_num,	stv_num,	name+":P_m")
+		,K_m(stv_num,	mes_num,	name+":K_m")
 		{
 			// init
-			init();
+			P_m = P_m.ide();
+			Q_m = Q_m.ide();
+			R_m = R_m.ide();
 		}
 	virtual ~KalmanFilter() {
 	}
@@ -105,6 +158,7 @@ public:
 		P_m = ( Matrix<double>::ide(K_m.Row()) - K_m * H_m ) * P_m;
 	}
 };
+
 double BIAS = 1.0;
 
 double x[STV_NUM] = {
@@ -226,7 +280,6 @@ int main(int argc, char* argv[])
 		P = F * P * F.tra() + B * Q * B.tra();
 		// gain
 		K = P * H.tra() * (H * P * H.tra() + R).inv();
-		K.print();
 		// update
 		X = F * X + K * (Z - H * F * X);
 		// P next
